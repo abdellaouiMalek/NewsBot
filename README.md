@@ -42,5 +42,6 @@ pip install -r requirements.txt
 - 👩‍💻 **[Ben Mohamed Malak](https://www.linkedin.com/in/malak-ben-mohamed-238663348/)**
 - 👨‍💻 **[Kacem Skander](https://www.linkedin.com/in/skander-kacem-45639a348/)**
 
+---
 
 ⚡ **NewsBot AI — Smart, fast, and reliable news at your fingertips.**
