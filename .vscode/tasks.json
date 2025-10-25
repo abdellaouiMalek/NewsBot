@@ -1,0 +1,47 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Format (black)",
+            "type": "shell",
+            "command": "black .",
+            "group": "none",
+            "problemMatcher": []
+        },
+        {
+            "label": "Organize Imports (isort)",
+            "type": "shell",
+            "command": "isort .",
+            "group": "none",
+            "problemMatcher": []
+        },
+        {
+            "label": "Lint (flake8)",
+            "type": "shell",
+            "command": "flake8 .",
+            "group": "none",
+            "problemMatcher": []
+        },
+        {
+            "label": "Test (pytest)",
+            "type": "shell",
+            "command": "pytest",
+            "group": "test",
+            "problemMatcher": []
+        },
+        {
+            "label": "Run API (uvicorn)",
+            "type": "shell",
+            "command": "uvicorn main:app --host 0.0.0.0 --port 8000",
+            "isBackground": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "Run API (uvicorn reload)",
+            "type": "shell",
+            "command": "uvicorn main:app --host 0.0.0.0 --port 8000 --reload",
+            "isBackground": true,
+            "problemMatcher": []
+        }
+    ]
+}

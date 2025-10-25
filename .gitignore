@@ -46,7 +46,6 @@ celerybeat-schedule
 celerybeat.pid
 
 # IDEs / Editors
-.vscode/
 .idea/
 *.sublime-project
 *.sublime-workspace
@@ -83,9 +82,6 @@ gunicorn.log
 # === PyCharm ===
 .idea/
 *.iml
-
-# === VSCode ===
-.vscode/
 
 # === Optional: if using poetry or pipenv ===
 .poetry/
