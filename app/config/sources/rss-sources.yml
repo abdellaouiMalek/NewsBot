@@ -1,0 +1,172 @@
+rss:
+  world:
+    - name: "BBC News - World"
+      url: "https://feeds.bbci.co.uk/news/world/rss.xml"
+      category: "world"
+      language: "en"
+      update_period: "minute-level (ad-hoc)"
+      active: true
+      notes: "Updated frequently; reliable international coverage"
+    - name: "Reuters - World News"
+      url: "https://feeds.reuters.com/Reuters/worldNews"
+      category: "world"
+      language: "en"
+      update_period: "10 min (estimate)"
+      active: true
+      notes: "Global news; update frequency variable"
+    - name: "Al Jazeera - All News"
+      url: "https://www.aljazeera.com/xml/rss/all.xml"
+      category: "world"
+      language: "en"
+      update_period: "10-15 min (estimate)"
+      active: true
+      notes: "Wide coverage of international news"
+    - name: "AP News - World"
+      url: "https://apnews.com/hub/ap-top-news?outputType=rss"
+      category: "world"
+      language: "en"
+      update_period: "10 min (estimate)"
+      active: true
+      notes: "Trusted wire service"
+
+  business:
+    - name: "BBC News - Business"
+      url: "https://feeds.bbci.co.uk/news/business/rss.xml"
+      category: "business"
+      language: "en"
+      update_period: "minute-level (ad-hoc)"
+      active: true
+    - name: "The New York Times - Business"
+      url: "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml"
+      category: "business"
+      language: "en"
+      update_period: "30 min (estimate)"
+      active: true
+    - name: "Reuters - Business News"
+      url: "https://feeds.reuters.com/Reuters/businessNews"
+      category: "business"
+      language: "en"
+      update_period: "10 min (estimate)"
+      active: true
+
+  technology:
+    - name: "Ars Technica - Technology Lab"
+      url: "https://feeds.arstechnica.com/arstechnica/technology-lab"
+      category: "technology"
+      language: "en"
+      update_period: "hourly (estimate)"
+      active: true
+    - name: "The Verge - All Technology"
+      url: "https://www.theverge.com/rss/index.xml"
+      category: "technology"
+      language: "en"
+      update_period: "hourly (estimate)"
+      active: true
+    - name: "Wired - Technology"
+      url: "https://www.wired.com/feed/category/technology/latest/rss"
+      category: "technology"
+      language: "en"
+      update_period: "hourly (estimate)"
+      active: true
+
+  science:
+    - name: "Scientific American - News"
+      url: "https://rss.sciam.com/ScientificAmerican-News"
+      category: "science"
+      language: "en"
+      update_period: "daily (estimate)"
+      active: true
+    - name: "Nature - Science RSS"
+      url: "https://www.nature.com/subjects/science.rss"
+      category: "science"
+      language: "en"
+      update_period: "daily (estimate)"
+      active: true
+    - name: "ScienceDaily - Science News"
+      url: "https://www.sciencedaily.com/rss/top/science.xml"
+      category: "science"
+      language: "en"
+      update_period: "daily (estimate)"
+      active: true
+
+  health:
+    - name: "Medical News Today"
+      url: "https://www.medicalnewstoday.com/rss"
+      category: "health"
+      language: "en"
+      update_period: "daily (estimate)"
+      active: true
+    - name: "WHO - News Releases"
+      url: "https://www.who.int/feeds/entity/mediacentre/news/en/rss.xml"
+      category: "health"
+      language: "en"
+      update_period: "daily (estimate)"
+      active: true
+
+  general:
+    - name: "CNN - Top Stories"
+      url: "http://rss.cnn.com/rss/cnn_topstories.rss"
+      category: "general"
+      language: "en"
+      update_period: "10-30 min (estimate)"
+      active: true
+    - name: "ABC News - Most Popular"
+      url: "https://abcnews.go.com/abcnews/topstories.rss"
+      category: "general"
+      language: "en"
+      update_period: "30 min (estimate)"
+      active: true
+    - name: "USA Today - News"
+      url: "https://rssfeeds.usatoday.com/usatoday-NewsTopStories"
+      category: "general"
+      language: "en"
+      update_period: "30 min (estimate)"
+      active: true
+
+  arts:
+    - name: "BBC - Culture"
+      url: "https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml"
+      category: "arts"
+      language: "en"
+      update_period: "hourly (estimate)"
+      active: true
+    - name: "The Guardian - Culture"
+      url: "https://www.theguardian.com/culture/rss"
+      category: "arts"
+      language: "en"
+      update_period: "hourly (estimate)"
+      active: true
+    - name: "NYT - Arts"
+      url: "https://rss.nytimes.com/services/xml/rss/nyt/Arts.xml"
+      category: "arts"
+      language: "en"
+      update_period: "hourly (estimate)"
+      active: true
+
+  music:
+    - name: "Rolling Stone - Music News"
+      url: "https://www.rollingstone.com/music/music-news/feed/"
+      category: "music"
+      language: "en"
+      update_period: "daily (estimate)"
+      active: true
+    - name: "Billboard - Music News"
+      url: "https://www.billboard.com/feed/"
+      category: "music"
+      language: "en"
+      update_period: "daily (estimate)"
+      active: true
+
+  film_tv:
+    - name: "Variety - Film & TV"
+      url: "https://variety.com/feed/"
+      category: "film_tv"
+      language: "en"
+      update_period: "daily (estimate)"
+      active: true
+    - name: "The Hollywood Reporter - Film & TV"
+      url: "https://www.hollywoodreporter.com/t/rss/"
+      category: "film_tv"
+      language: "en"
+      update_period: "daily (estimate)"
+      active: true

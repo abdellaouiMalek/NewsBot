@@ -1,0 +1,101 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+*.manifest
+*.spec
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.env/
+env.bak/
+
+# PyInstaller
+# Usually contains compiled Python code and metadata
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+.coverage
+htmlcov/
+.tox/
+.nox/
+.pytest_cache/
+.cache/
+
+# Type checker
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# Logs
+*.log
+logs/
+celerybeat-schedule
+celerybeat.pid
+
+# IDEs / Editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Jupyter notebooks
+.ipynb_checkpoints
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker
+*.pid
+*.seed
+docker-compose.override.yml
+# Ignore local docker volumes if any
+data/
+db_data/
+redis_data/
+
+# === FastAPI specific ===
+# Uvicorn or Gunicorn logs
+*.db
+*.sqlite3
+*.sqlite
+uvicorn.log
+gunicorn.log
+
+# === PyCharm ===
+.idea/
+*.iml
+
+# === VSCode ===
+.vscode/
+
+# === Optional: if using poetry or pipenv ===
+.poetry/
+Pipfile.lock
+poetry.lock
+
+# === Optional: if using coverage ===
+coverage.xml
+
+# === Optional: if using alembic (SQL migrations) ===
+alembic/versions/*.pyc
+alembic/__pycache__/
+alembic/*.pyc

@@ -1,0 +1,67 @@
+api:
+  world:
+    - newsapi:
+        name: "NewsAPI - World"
+        url: "https://newsapi.org/v2/top-headlines"
+        params:
+          category: "world"
+        headers:
+          Authorization: "Bearer b54dd7351e124f71bf9de85ff851ca8c"
+
+  business:
+    - newsapi:
+        name: "NewsAPI - Business"
+        url: "https://newsapi.org/v2/top-headlines"
+        params:
+          category: "business"
+        headers:
+          Authorization: "Bearer b54dd7351e124f71bf9de85ff851ca8c"
+
+  technology:
+    - newsapi:
+        name: "NewsAPI - Technology"
+        url: "https://newsapi.org/v2/top-headlines"
+        params:
+          category: "technology"
+        headers:
+          Authorization: "Bearer b54dd7351e124f71bf9de85ff851ca8c"
+
+  science:
+    - newsapi:
+        name: "NewsAPI - Science"
+        url: "https://newsapi.org/v2/top-headlines"
+        params:
+          category: "science"
+        headers:
+          Authorization: "Bearer b54dd7351e124f71bf9de85ff851ca8c"
+
+  health:
+    - newsapi:
+        name: "NewsAPI - Health"
+        url: "https://newsapi.org/v2/top-headlines"
+        params:
+          category: "health"
+        headers:
+          Authorization: "Bearer b54dd7351e124f71bf9de85ff851ca8c"
+
+  general:
+    - newsapi:
+        name: "NewsAPI - General"
+        url: "https://newsapi.org/v2/top-headlines"
+        params:
+          category: "general"
+        headers:
+          Authorization: "Bearer b54dd7351e124f71bf9de85ff851ca8c"
+
+  arts:
+    - newsapi:
+        name: "NewsAPI - Arts"
+        url: "https://newsapi.org/v2/top-headlines"
+        params:
+          category: "entertainment"
+        headers:
+          Authorization: "Bearer b54dd7351e124f71bf9de85ff851ca8c"
+
+  music: []
+
+  film_tv: []

@@ -1,0 +1,3 @@
+rss: "./rss_sources.yml"
+api: "./api_sources.yml"
+scrapers: "./web_scrapers.yml"

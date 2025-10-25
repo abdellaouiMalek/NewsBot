@@ -1,0 +1,6 @@
+techcrunch:
+  url: "https://techcrunch.com/"
+  parser: "beautifulsoup"
+  article_selector: "div.post-block"
+  title_selector: "h2.post-block__title a"
+  date_selector: "time"
