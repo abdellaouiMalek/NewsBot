@@ -17,3 +17,8 @@ pandas
 feedparser
 apscheduler[asyncio]
 requests
+spacy
+sentence-transformers
+torch
+qdrant-client
+langchain

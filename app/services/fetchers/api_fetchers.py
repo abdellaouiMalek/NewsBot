@@ -6,6 +6,7 @@ import yaml
 
 from app.models.enums import FetchMethod
 from app.schemas.article import ArticleCreate
+from app.utils.article_utils import enhance_metadata
 
 
 def get_api_sources() -> List[Dict]:
@@ -49,7 +50,7 @@ def fetch_articles_from_newsapi(source: Dict) -> List[ArticleCreate]:
             article = ArticleCreate(
                 article_id=article_id,
                 title=item.get("title") or "No title",
-                content=item.get("content"),
+                content=item.get("content", item.get("description")),
                 summary=item.get("description"),
                 author=item.get("author"),
                 published_at=published_at or datetime.utcnow(),
@@ -66,9 +67,11 @@ def fetch_articles_from_newsapi(source: Dict) -> List[ArticleCreate]:
                 tags=[t.term for t in item.tags] if "tags" in item else [],
                 sentiment=None,
                 entities=None,
-                embedding=None,
                 raw_data=item,
             )
+
+            article = enhance_metadata(article)
+
             articles_list.append(article)
 
         return articles_list

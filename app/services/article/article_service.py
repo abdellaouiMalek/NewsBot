@@ -3,6 +3,7 @@ from typing import List, Optional
 
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
+from pymongo import UpdateOne
 
 from app.models.article import Article
 from app.schemas.article import ArticleCreate, ArticleUpdate
@@ -152,3 +153,110 @@ class ArticleService:
         async for article_data in cursor:
             articles.append(Article(**article_data))
         return articles
+
+    async def bulk_insert_articles(self, articles: list[dict]) -> List[Article]:
+        """Insert multiple articles and return Article instances
+        of inserted/updated docs."""
+        if not articles:
+            return []
+
+        operations = [
+            UpdateOne(
+                {"article_id": a["article_id"]},
+                {
+                    "$setOnInsert": {
+                        **a,
+                        "created_at": datetime.utcnow(),
+                        "updated_at": datetime.utcnow(),
+                        "fetched_at": datetime.utcnow(),
+                    }
+                },
+                upsert=True,
+            )
+            for a in articles
+        ]
+
+        await self.collection.bulk_write(operations, ordered=False)
+
+        # Fetch inserted/updated articles without the _id field
+        article_ids = [a["article_id"] for a in articles]
+        inserted_docs = await self.collection.find(
+            {"article_id": {"$in": article_ids}}, {"_id": 0}
+        ).to_list(None)
+
+        return [Article(**doc) for doc in inserted_docs]
+
+    async def update_entities_bulk(self, articles: list[dict]) -> int:
+        """
+        Update the 'entities' field for multiple articles in bulk.
+        Each article dict must have 'article_id' and 'entities'.
+        Returns the number of articles updated.
+        """
+        if not articles:
+            return 0
+
+        operations = []
+        for article in articles:
+            if "article_id" not in article or "entities" not in article:
+                continue  # skip invalid entries
+
+            operations.append(
+                UpdateOne(
+                    {"article_id": article["article_id"]},
+                    {
+                        "$set": {
+                            "entities": article["entities"],
+                            "updated_at": datetime.utcnow(),
+                        }
+                    },
+                )
+            )
+
+        if not operations:
+            return 0
+
+        result = await self.collection.bulk_write(operations, ordered=False)
+        return result.modified_count
+
+    async def update_embeddings_bulk(self, articles: list[dict]) -> int:
+        """
+        Bulk update embedding fields for multiple articles.
+        Each article dict must have 'article_id' and embedding fields.
+        Returns the number of articles updated.
+        """
+        if not articles:
+            return 0
+
+        operations = []
+        for article in articles:
+            article_id = article.get("article_id")
+            if not article_id:
+                continue
+
+            update_fields = {}
+            for key in [
+                "embedding_primary_text",
+                "embedding_secondary_text",
+                "embedding_primary",
+                "embedding_secondary",
+            ]:
+                if key in article:
+                    update_fields[key] = article[key]
+
+            if not update_fields:
+                continue
+
+            update_fields["updated_at"] = datetime.utcnow()
+
+            operations.append(
+                UpdateOne(
+                    {"article_id": article_id},
+                    {"$set": update_fields},
+                )
+            )
+
+        if not operations:
+            return 0
+
+        result = await self.collection.bulk_write(operations, ordered=False)
+        return result.modified_count

@@ -27,6 +27,13 @@ class Article(BaseDocument):
     media_thumbnail: Optional[str] = Field(None)
     tags: List[str] = Field(default_factory=list)
     sentiment: Optional[str] = Field(None, max_length=220)
-    entities: Optional[List[str]] = Field(None)
+    entities: Optional[str] = Field(
+        None,
+        description="Formatted named entities extracted from the article text",
+        example="persons: John Doe | organizations: BBC News | locations: London",
+    )
     raw_data: Optional[dict] = Field(None)
-    embedding: Optional[List[float]] = Field(None)
+    embedding_primary_text: Optional[str]
+    embedding_secondary_text: Optional[str]
+    embedding_primary: Optional[List[float]] = Field(None)
+    embedding_secondary: Optional[List[float]] = Field(None)

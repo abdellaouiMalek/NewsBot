@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     mongo_express_password: str = "admin"
     mongo_express_port: int = 8081
 
+    # Qdrant settings
+    qdrant_host: str = "localhost"
+    qdrant_port: int = 6333
+    qdrant_api_url: str = None  # will be constructed automatically if not set
+    qdrant_collection: str = "articles_embeddings"
+
     # Application settings
     debug: bool = True
     environment: str = "development"
@@ -41,6 +47,11 @@ class Settings(BaseSettings):
         env_nested_delimiter = "__"
         extra = "ignore"
 
+    def __post_init__(self):
+        # Construct Qdrant API URL if not explicitly set
+        if not self.qdrant_api_url:
+            self.qdrant_api_url = f"http://{self.qdrant_host}:{self.qdrant_port}"
+
 
 # Create a global settings instance
 settings = Settings()
@@ -48,5 +59,5 @@ settings = Settings()
 # Debug: Print loaded settings
 if settings.debug:
     print(
-        f"🔧 Config loaded from .env: ENV={settings.env}, MONGO_DB={settings.mongo_db}"
+        f"🔧 Config loaded: ENV={settings.env}, MONGO_DB={settings.mongo_db}, QDRANT_API_URL={settings.qdrant_api_url}"
     )
