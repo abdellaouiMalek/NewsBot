@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import FieldCondition, Filter, MatchValue, PointStruct
 
-from app.core.qdrant import get_qdrant_client
+from app.core.qdrant import get_collection_name, get_qdrant_client
 from app.schemas.article_embedding import (
     ArticleEmbeddingCreate,
     ArticleEmbeddingResponse,
@@ -13,7 +13,7 @@ from app.schemas.article_embedding import (
 
 logger = logging.getLogger(__name__)
 
-COLLECTION_NAME = "articles_embeddings"
+COLLECTION_NAME = get_collection_name()
 
 
 class EmbeddingService:
@@ -23,23 +23,29 @@ class EmbeddingService:
         self.client: QdrantClient = get_qdrant_client()
 
     def _url_to_point_id(self, url: str) -> int:
-        """Convert URL to integer point ID using hash."""
-        hash_object = hashlib.md5(url.encode())
+        """Convert URL (article_id) to deterministic integer point ID using MD5."""
+        hash_object = hashlib.md5(url.encode("utf-8"))
         hash_hex = hash_object.hexdigest()
+        # keep first 16 hex chars -> fits in 64-bit
         point_id = int(hash_hex[:16], 16)
         return point_id
 
     def upsert_embedding(
         self, embedding: ArticleEmbeddingCreate
     ) -> ArticleEmbeddingResponse:
-        """Insert or update a single embedding with multiple vectors."""
+        """Insert or update a single embedding with multiple named vectors."""
+        if not embedding.vectors:
+            logger.warning("No vectors provided for %s", embedding.article_id)
+            raise ValueError("No vectors provided")
+
         point_id = self._url_to_point_id(embedding.article_id)
 
+        # Qdrant supports PointStruct.vector as either a list (single vector) or a dict (named vectors)
         point = PointStruct(
-            id=point_id,  # Use integer hash internally
-            vector=embedding.vectors,
+            id=point_id,
+            vector=embedding.vectors,  # named-vectors dict expected
             payload={
-                "article_id": embedding.article_id,  # Store original URL
+                "article_id": embedding.article_id,
                 "category": embedding.category,
                 "source_name": embedding.source_name,
                 "published_at": (
@@ -51,11 +57,10 @@ class EmbeddingService:
         )
 
         self.client.upsert(collection_name=COLLECTION_NAME, points=[point])
-        logger.info(f"✅ Upserted embedding for article {embedding.article_id}")
+        logger.info("Upserted embedding for article %s", embedding.article_id)
 
-        # Return response with original article_id, not the point_id
         return ArticleEmbeddingResponse(
-            id=embedding.article_id,  # Return original URL as ID
+            id=embedding.article_id,
             article_id=embedding.article_id,
             vectors=embedding.vectors,
             category=embedding.category,
@@ -66,68 +71,73 @@ class EmbeddingService:
     def batch_upsert(
         self, embeddings: List[ArticleEmbeddingCreate]
     ) -> List[ArticleEmbeddingResponse]:
-        """Upsert multiple embeddings at once."""
         points: List[PointStruct] = []
         responses: List[ArticleEmbeddingResponse] = []
 
-        for embedding in embeddings:
-            if not embedding.vectors:
-                logger.warning(f"Skipping article {embedding.article_id} - no vectors")
+        required_vectors = [
+            "title_embedding",
+            "primary_embedding",
+            "secondary_embedding",
+        ]
+
+        for emb in embeddings:
+            if not emb.vectors:
+                logger.warning("Skipping %s - no vectors", emb.article_id)
                 continue
-
-            # Validate that all required vectors are present
-            required_vectors = [
-                "title_embedding",
-                "primary_embedding",
-                "secondary_embedding",
-            ]
-            missing_vectors = [
-                vec for vec in required_vectors if vec not in embedding.vectors
-            ]
-
-            if missing_vectors:
+            missing = [v for v in required_vectors if v not in emb.vectors]
+            if missing:
                 logger.warning(
-                    f"Article {embedding.article_id} missing vectors: {missing_vectors}"
+                    "Skipping %s - missing vectors %s", emb.article_id, missing
                 )
                 continue
 
-            point_id = self._url_to_point_id(embedding.article_id)
-
+            pid = self._url_to_point_id(emb.article_id)
             points.append(
                 PointStruct(
-                    id=point_id,  # Use integer hash internally
-                    vector=embedding.vectors,
+                    id=pid,
+                    vector=emb.vectors,
                     payload={
-                        "article_id": embedding.article_id,  # Store original URL
-                        "category": embedding.category,
-                        "source_name": embedding.source_name,
+                        "article_id": emb.article_id,
+                        "category": emb.category,
+                        "source_name": emb.source_name,
                         "published_at": (
-                            embedding.published_at.isoformat()
-                            if embedding.published_at
-                            else None
+                            emb.published_at.isoformat() if emb.published_at else None
                         ),
                     },
                 )
             )
-            # Return response with original article_id, not the point_id
             responses.append(
                 ArticleEmbeddingResponse(
-                    id=embedding.article_id,  # Return original URL as ID
-                    article_id=embedding.article_id,
-                    vectors=embedding.vectors,
-                    category=embedding.category,
-                    source_name=embedding.source_name,
-                    published_at=embedding.published_at,
+                    id=emb.article_id,
+                    article_id=emb.article_id,
+                    vectors=emb.vectors,
+                    category=emb.category,
+                    source_name=emb.source_name,
+                    published_at=emb.published_at,
                 )
             )
 
         if points:
             self.client.upsert(collection_name=COLLECTION_NAME, points=points)
-            logger.info(f"✅ Batch upserted {len(points)} embeddings into Qdrant")
+            logger.info("Batch upserted %d embeddings", len(points))
         else:
-            logger.warning("No embeddings to upsert in batch")
+            logger.warning("No valid embeddings to upsert")
 
         return responses
+
+    def _build_filter(
+        self, category: Optional[str], source_name: Optional[str]
+    ) -> Optional[Filter]:
+        conditions = []
+        if category:
+            conditions.append(
+                FieldCondition(key="category", match=MatchValue(value=category))
+            )
+        if source_name:
+            conditions.append(
+                FieldCondition(key="source_name", match=MatchValue(value=source_name))
+            )
+        return Filter(must=conditions) if conditions else None
 
     def search_similar(
         self,
@@ -137,36 +147,34 @@ class EmbeddingService:
         category: Optional[str] = None,
         source_name: Optional[str] = None,
     ) -> List[str]:
-        """Search for similar embeddings and return list of article URLs."""
-        filter_conditions = []
-        if category:
-            filter_conditions.append(
-                FieldCondition(key="category", match=MatchValue(value=category))
-            )
-        if source_name:
-            filter_conditions.append(
-                FieldCondition(key="source_name", match=MatchValue(value=source_name))
-            )
+        """
+        Search similar articles using the named vector.
+        IMPORTANT: for named vectors we pass query_vector as a mapping: {vector_name: vector}
+        """
+        q_filter = self._build_filter(category, source_name)
 
-        q_filter = Filter(must=filter_conditions) if filter_conditions else None
+        # For named vectors we pass a dict: { "primary_embedding": [..] }
+        named_query_vector = {vector_name: query_vector}
 
         results = self.client.search(
             collection_name=COLLECTION_NAME,
-            query_vector=query_vector,
+            query_vector=named_query_vector,
             query_filter=q_filter,
             limit=limit,
-            with_payload=True,  # We need payload to get the original article_id
+            with_payload=True,
             with_vectors=False,
         )
 
-        # Return the original article URLs from payload
         article_ids = []
         for res in results:
-            article_id = res.payload.get("article_id")
-            if article_id:
-                article_ids.append(article_id)
+            aid = res.payload.get("article_id")
+            if aid:
+                article_ids.append(aid)
             else:
-                logger.warning(f"Search result missing article_id in payload: {res.id}")
+                logger.warning(
+                    "Search hit missing article_id for point %s",
+                    getattr(res, "id", "<unknown>"),
+                )
 
         return article_ids
 
@@ -177,177 +185,123 @@ class EmbeddingService:
         category: Optional[str] = None,
         source_name: Optional[str] = None,
     ) -> Dict[str, List[str]]:
-        """Search using multiple vectors and return results for each."""
-        filter_conditions = []
-        if category:
-            filter_conditions.append(
-                FieldCondition(key="category", match=MatchValue(value=category))
-            )
-        if source_name:
-            filter_conditions.append(
-                FieldCondition(key="source_name", match=MatchValue(value=source_name))
-            )
-
-        q_filter = Filter(must=filter_conditions) if filter_conditions else None
-
+        """
+        Search using multiple named vectors. We call Qdrant per named vector.
+        """
+        q_filter = self._build_filter(category, source_name)
         results = {}
-        for vector_name, query_vector in query_vectors.items():
-            search_results = self.client.search(
+        for name, vec in query_vectors.items():
+            named_query_vector = {name: vec}
+            hits = self.client.search(
                 collection_name=COLLECTION_NAME,
-                query_vector=query_vector,
+                query_vector=named_query_vector,
                 query_filter=q_filter,
                 limit=limit,
                 with_payload=True,
                 with_vectors=False,
             )
-            article_ids = []
-            for res in search_results:
-                article_id = res.payload.get("article_id")
-                if article_id:
-                    article_ids.append(article_id)
-                else:
-                    logger.warning(
-                        f"Search result missing article_id in payload: {res.id}"
-                    )
-
-            results[vector_name] = article_ids
-
+            article_ids = [
+                h.payload.get("article_id") for h in hits if h.payload.get("article_id")
+            ]
+            results[name] = article_ids
         return results
 
     def get_embedding_by_article_id(
         self, article_id: str
     ) -> Optional[ArticleEmbeddingResponse]:
-        """Retrieve an embedding by article URL - returns original URL in response."""
-        point_id = self._url_to_point_id(article_id)
+        pid = self._url_to_point_id(article_id)
         points = self.client.retrieve(
             collection_name=COLLECTION_NAME,
-            ids=[point_id],
+            ids=[pid],
             with_vectors=True,
             with_payload=True,
         )
         if not points:
             return None
-
-        point = points[0]
-
-        # Extract the original article_id from payload
-        original_article_id = point.payload.get("article_id", article_id)
-
+        p = points[0]
         return ArticleEmbeddingResponse(
-            id=original_article_id,  # Return original URL
-            article_id=original_article_id,
-            vectors=point.vector,
-            category=point.payload.get("category"),
-            source_name=point.payload.get("source_name"),
-            published_at=point.payload.get("published_at"),
-        )
-
-    def get_embedding_by_point_id(
-        self, point_id: int
-    ) -> Optional[ArticleEmbeddingResponse]:
-        """Retrieve an embedding by point ID - returns original URL in response."""
-        points = self.client.retrieve(
-            collection_name=COLLECTION_NAME,
-            ids=[point_id],
-            with_vectors=True,
-            with_payload=True,
-        )
-        if not points:
-            return None
-
-        point = points[0]
-        original_article_id = point.payload.get("article_id")
-
-        if not original_article_id:
-            logger.warning(f"Point {point_id} missing article_id in payload")
-            return None
-
-        return ArticleEmbeddingResponse(
-            id=original_article_id,  # Return original URL
-            article_id=original_article_id,
-            vectors=point.vector,
-            category=point.payload.get("category"),
-            source_name=point.payload.get("source_name"),
-            published_at=point.payload.get("published_at"),
+            id=p.payload.get("article_id", article_id),
+            article_id=p.payload.get("article_id", article_id),
+            vectors=p.vector,
+            category=p.payload.get("category"),
+            source_name=p.payload.get("source_name"),
+            published_at=p.payload.get("published_at"),
         )
 
     def delete_embedding(self, article_id: str):
-        """Delete an embedding by article URL."""
-        point_id = self._url_to_point_id(article_id)
+        pid = self._url_to_point_id(article_id)
         self.client.delete(
-            collection_name=COLLECTION_NAME, points_selector={"ids": [point_id]}
+            collection_name=COLLECTION_NAME, points_selector={"ids": [pid]}
         )
-        logger.info(f"🗑️ Deleted embedding for article {article_id}")
+        logger.info("Deleted embedding for %s", article_id)
 
     def batch_get_embeddings(
         self, article_ids: List[str]
     ) -> List[ArticleEmbeddingResponse]:
-        """Get multiple embeddings by article URLs."""
-        point_ids = [self._url_to_point_id(article_id) for article_id in article_ids]
+        pids = [self._url_to_point_id(aid) for aid in article_ids]
         points = self.client.retrieve(
             collection_name=COLLECTION_NAME,
-            ids=point_ids,
+            ids=pids,
             with_vectors=True,
             with_payload=True,
         )
-
-        responses = []
-        for point in points:
-            original_article_id = point.payload.get("article_id")
-            if original_article_id:
-                responses.append(
+        out = []
+        for p in points:
+            original_id = p.payload.get("article_id")
+            if original_id:
+                out.append(
                     ArticleEmbeddingResponse(
-                        id=original_article_id,  # Return original URL
-                        article_id=original_article_id,
-                        vectors=point.vector,
-                        category=point.payload.get("category"),
-                        source_name=point.payload.get("source_name"),
-                        published_at=point.payload.get("published_at"),
+                        id=original_id,
+                        article_id=original_id,
+                        vectors=p.vector,
+                        category=p.payload.get("category"),
+                        source_name=p.payload.get("source_name"),
+                        published_at=p.payload.get("published_at"),
                     )
                 )
             else:
-                logger.warning(f"Point {point.id} missing article_id in payload")
+                logger.warning(
+                    "Point %s missing article_id", getattr(p, "id", "<unknown>")
+                )
+        return out
 
-        return responses
-
-    def get_all_embeddings(self, limit: int = 1000) -> List[ArticleEmbeddingResponse]:
-        """Get all embeddings with original URLs."""
-        # Use scroll API to get all points
+    def get_all_embeddings(
+        self, batch_size: int = 100
+    ) -> List[ArticleEmbeddingResponse]:
+        # use scroll to iterate through collection
         all_points = []
-        next_page_offset = None
-
+        offset = 0
         while True:
-            records, next_page_offset = self.client.scroll(
+            records, next_offset = self.client.scroll(
                 collection_name=COLLECTION_NAME,
-                limit=min(limit, 100),  # Scroll in batches
-                offset=next_page_offset,
+                limit=batch_size,
+                offset=offset,
                 with_vectors=True,
                 with_payload=True,
             )
-
             if not records:
                 break
-
             all_points.extend(records)
-
-            if next_page_offset is None:
+            if next_offset is None:
                 break
+            offset = next_offset
 
         responses = []
-        for point in all_points:
-            original_article_id = point.payload.get("article_id")
-            if original_article_id:
+        for p in all_points:
+            original_id = p.payload.get("article_id")
+            if original_id:
                 responses.append(
                     ArticleEmbeddingResponse(
-                        id=original_article_id,  # Return original URL
-                        article_id=original_article_id,
-                        vectors=point.vector,
-                        category=point.payload.get("category"),
-                        source_name=point.payload.get("source_name"),
-                        published_at=point.payload.get("published_at"),
+                        id=original_id,
+                        article_id=original_id,
+                        vectors=p.vector,
+                        category=p.payload.get("category"),
+                        source_name=p.payload.get("source_name"),
+                        published_at=p.payload.get("published_at"),
                     )
                 )
             else:
-                logger.warning(f"Point {point.id} missing article_id in payload")
-
+                logger.warning(
+                    "Point %s missing article_id", getattr(p, "id", "<unknown>")
+                )
         return responses

@@ -4,6 +4,9 @@
 
 DOCKER_COMPOSE := docker compose --env-file .env -f docker-compose.yml
 
+# Prefer uvicorn on PATH, otherwise fall back to venv/.venv
+UVICORN := $(shell which uvicorn 2>/dev/null || ( [ -x venv/bin/uvicorn ] && echo venv/bin/uvicorn ) || ( [ -x .venv/bin/uvicorn ] && echo .venv/bin/uvicorn ) || echo venv/bin/uvicorn)
+
 # -------------------------
 # Help
 # -------------------------
@@ -57,11 +60,23 @@ rebuild:
 # -------------------------
 .PHONY: run
 run:
-	uvicorn main:app --host 0.0.0.0 --port 8000
+	@# Activate project's venv (if present) then run uvicorn
+	@if [ -f venv/bin/activate ]; then \
+		. venv/bin/activate; \
+	elif [ -f .venv/bin/activate ]; then \
+		. .venv/bin/activate; \
+	fi; \
+	$(UVICORN) main:app --host 0.0.0.0 --port 8000
 
 .PHONY: run-dev
 run-dev:
-	uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+	@# Activate project's venv (if present) then run uvicorn with reload
+	@if [ -f venv/bin/activate ]; then \
+		. venv/bin/activate; \
+	elif [ -f .venv/bin/activate ]; then \
+		. .venv/bin/activate; \
+	fi; \
+	$(UVICORN) main:app --host 0.0.0.0 --port 8000 --reload
 
 # -------------------------
 # Start individual services
@@ -119,5 +134,11 @@ urls:
 .PHONY: spacy-model
 spacy-model:
 	@echo "⚡ Installing spaCy English model..."
-	@project/venv/bin/python -m spacy download en_core_web_sm
+	@if [ -x venv/bin/python ]; then \
+		venv/bin/python -m spacy download en_core_web_sm; \
+	elif [ -x .venv/bin/python ]; then \
+		.venv/bin/python -m spacy download en_core_web_sm; \
+	else \
+		python -m spacy download en_core_web_sm; \
+	fi
 	@echo "✅ spaCy model installed."

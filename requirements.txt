@@ -20,7 +20,10 @@ requests
 spacy
 sentence-transformers
 torch
-qdrant-client
+qdrant-client 
 langchain
 langchain-openai
 redis
+langchain-community
+langchain-qdrant
+langchain-huggingface
