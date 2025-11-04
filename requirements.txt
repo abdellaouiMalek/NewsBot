@@ -22,3 +22,5 @@ sentence-transformers
 torch
 qdrant-client
 langchain
+langchain-openai
+redis

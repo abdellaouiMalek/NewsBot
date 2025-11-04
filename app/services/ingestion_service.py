@@ -9,7 +9,12 @@ from app.services.fetchers.api_fetchers import (
     get_api_sources,
 )
 from app.services.fetchers.rss_fetcher import fetch_feed, get_rss_sources
-from app.utils.article_utils import deduplicate, extract_embeddings, extract_entities
+from app.utils.article_utils import (
+    deduplicate,
+    extract_embeddings,
+    extract_embeddings_qdrant,
+    extract_entities,
+)
 
 
 async def fetch_and_store_rss_articles(db, background_tasks: BackgroundTasks) -> List:
@@ -123,3 +128,4 @@ async def entities_and_embeddings_process(articles, db):
     """
     await extract_entities(articles, db)
     await extract_embeddings(articles, db)
+    await extract_embeddings_qdrant(articles, db)

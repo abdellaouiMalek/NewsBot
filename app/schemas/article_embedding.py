@@ -44,8 +44,8 @@ class ArticleEmbeddingUpdate(BaseModel):
 class ArticleEmbeddingResponse(BaseModel):
     """Schema for returning embeddings and metadata from Qdrant."""
 
-    id: str = Field(..., description="Qdrant point ID (same as article_id)")
-    article_id: str = Field(..., description="Reference to the MongoDB article")
+    id: str = Field(..., description="Original article URL")
+    article_id: str = Field(..., description="Original article URL (same as id)")
     vectors: Dict[str, List[float]] = Field(..., description="Stored embeddings")
     category: Optional[str] = None
     source_name: Optional[str] = None

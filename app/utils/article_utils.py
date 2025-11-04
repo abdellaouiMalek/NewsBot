@@ -7,8 +7,14 @@ from langdetect import LangDetectException, detect
 from app.core.models.nlp_model import nlp
 from app.models.article import Article
 from app.schemas.article import ArticleCreate
+from app.schemas.article_embedding import ArticleEmbeddingCreate
 from app.services.article.article_service import ArticleService
-from app.utils.embedding_utils import compute_embeddings, prepare_embedding_text
+from app.services.embedding.embedding_service import EmbeddingService
+from app.utils.embedding_utils import (
+    compute_article_embeddings,
+    compute_embeddings,
+    prepare_embedding_text,
+)
 
 
 def deduplicate(new_records: List[Dict], existing_df: pd.DataFrame) -> pd.DataFrame:
@@ -141,3 +147,46 @@ async def extract_embeddings(articles: List[Article], db):
 
     # Update all embeddings in bulk
     await article_service.update_embeddings_bulk(updated_articles)
+
+
+async def extract_embeddings_qdrant(articles: List[Article], db):
+    """
+    Extract embeddings for articles and save them into Qdrant.
+
+    Works similarly to extract_embeddings, but persists directly in Qdrant.
+    """
+    print(f"🚀 Running background Qdrant embedding task for {len(articles)} articles")
+
+    embedding_service = EmbeddingService()
+    embeddings_to_upsert = []
+
+    for article in articles:
+        article_dict = article.dict()
+        # Prepare the text for embeddings
+        article_dict = prepare_embedding_text(article_dict)
+
+        # Compute vectors
+        vectors = compute_article_embeddings(article_dict)
+
+        print("\n==============================")
+        for name, vector in vectors.items():
+            if vector is None:
+                print(f"{name}: None")
+            else:
+                print(f"{name}: length={len(vector)}, first 5 values={vector[:5]}")
+        print("================================\n")
+
+        # Build Qdrant schema
+        embedding = ArticleEmbeddingCreate(
+            article_id=article.article_id,
+            vectors=vectors,
+            category=getattr(article, "category", None),
+            source_name=getattr(article, "source_name", None),
+            published_at=getattr(article, "published_at", None),
+        )
+
+        embeddings_to_upsert.append(embedding)
+
+    # Batch upsert into Qdrant
+    embedding_service.batch_upsert(embeddings_to_upsert)
+    print(f"✅ Finished Qdrant embedding task for {len(articles)} articles")
