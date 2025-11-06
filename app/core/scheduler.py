@@ -16,7 +16,7 @@ def configure_jobs():
     if not scheduler.get_job("fetch_news"):
         scheduler.add_job(
             fetch_all_news_job,
-            trigger=IntervalTrigger(minutes=15),
+            trigger=IntervalTrigger(minutes=20),
             id="fetch_news",
             replace_existing=True,
             max_instances=1,

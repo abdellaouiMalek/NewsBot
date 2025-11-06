@@ -20,6 +20,21 @@ class Settings(BaseSettings):
     mongo_express_password: str = "admin"
     mongo_express_port: int = 8081
 
+    # Qdrant settings
+    qdrant_host: str = "localhost"
+    qdrant_port: int = 6333
+    qdrant_api_url: str = None  # will be constructed automatically if not set
+    qdrant_collection: str = "articles_embeddings"
+
+    # LLM settings
+    llm_model: str = "gemma3:1b"
+    llm_base_url: str = "http://localhost:11434"
+
+    # Full Mongo connection string (optional override)
+    mongo_uri: str = (
+        "mongodb://NewsBotAI:secret@localhost:27017/newsbotdb?authSource=admin"
+    )
+
     # Application settings
     debug: bool = True
     environment: str = "development"
@@ -41,6 +56,17 @@ class Settings(BaseSettings):
         env_nested_delimiter = "__"
         extra = "ignore"
 
+    def model_post_init(self, __context):
+        """
+        pydantic v2 model post-init hook. Ensure derived values (like qdrant_api_url)
+        are populated when not provided explicitly via env.
+        """
+        if not self.qdrant_api_url:
+            # Prefer an explicit env var, otherwise construct from host/port
+            object.__setattr__(
+                self, "qdrant_api_url", f"http://{self.qdrant_host}:{self.qdrant_port}"
+            )
+
 
 # Create a global settings instance
 settings = Settings()
@@ -48,5 +74,5 @@ settings = Settings()
 # Debug: Print loaded settings
 if settings.debug:
     print(
-        f"🔧 Config loaded from .env: ENV={settings.env}, MONGO_DB={settings.mongo_db}"
+        f"🔧 Config loaded: ENV={settings.env}, MONGO_DB={settings.mongo_db}, QDRANT_API_URL={settings.qdrant_api_url}"
     )

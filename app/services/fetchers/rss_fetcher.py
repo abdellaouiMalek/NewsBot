@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from app.models.enums import FetchMethod
 from app.schemas.article import ArticleCreate
+from app.utils.article_utils import clean_rss_text, enhance_metadata
 
 
 def get_rss_sources() -> List[Dict]:
@@ -50,15 +51,21 @@ def fetch_feed(feed: Dict) -> List[ArticleCreate]:
             if "content" in entry and entry.content:
                 content = entry.content[0].value
 
+            content = clean_rss_text(content)
+
+            summary = entry.get("summary", "")
+
+            summary = clean_rss_text(summary)
+
             article = ArticleCreate(
                 article_id=entry.get("link"),
                 title=entry.get("title", f"No Title {i}"),
                 content=content,
-                summary=entry.get("summary", ""),
+                summary=summary,
                 author=entry.get("author"),
                 published_at=published_dt,
                 fetched_at=datetime.utcnow(),
-                source_name=feed["name"],
+                source_name=feed["source"],
                 source_url=feed["url"],
                 article_url=entry.get("link", ""),
                 category=feed.get("category"),
@@ -73,9 +80,15 @@ def fetch_feed(feed: Dict) -> List[ArticleCreate]:
                 tags=[t.term for t in entry.tags] if "tags" in entry else [],
                 sentiment=None,  # optional
                 entities=None,  # optional
-                embedding=None,  # optional
                 raw_data=dict(entry),
+                embedding_primary_text=None,
+                embedding_secondary_text=None,
+                embedding_primary=None,
+                embedding_secondary=None,
             )
+
+            article = enhance_metadata(article)
+
             articles.append(article)
         except ValidationError as ve:
             print(f"⚠️ {feed['name']} Entry {i}: Validation error: {ve}")

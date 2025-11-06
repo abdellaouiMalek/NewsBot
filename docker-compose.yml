@@ -49,5 +49,73 @@ services:
     networks:
       - newsbotai-net
 
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    restart: always
+    ports:
+      - "6333:6333"    # REST API
+      - "6334:6334"    # gRPC
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    networks:
+      - newsbotai-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  llm:
+    image: ollama/ollama
+    container_name: ollama_service
+    restart: always
+    ports:
+      - "11434:11434"
+    volumes:
+      - llm_models:/root/.ollama
+    environment:
+      - LLM_MODEL=${LLM_MODEL}
+      # Helpful for NVIDIA toolkit
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      # Keep model loaded in memory indefinitely (set to -1 or very long duration)
+      # This prevents model unloading after requests
+      - OLLAMA_KEEP_ALIVE=-1
+      # Increase max loaded models
+      - OLLAMA_MAX_LOADED_MODELS=1
+    # Request GPUs (works with Docker Compose v2 and NVIDIA Container Toolkit)
+    gpus: all
+    # Optional: Swarm-style reservation for completeness (ignored by non-swarm compose)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    entrypoint: >
+      bash -c "
+        ollama serve &
+        sleep 10 &&
+        echo 'Pulling model ${LLM_MODEL}...' &&
+        ollama pull ${LLM_MODEL} &&
+        echo 'Preloading model ${LLM_MODEL} into GPU memory...' &&
+        ollama run ${LLM_MODEL} 'Hello' &&
+        echo 'Model ${LLM_MODEL} is now loaded and ready!' &&
+        wait
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - newsbotai-net
+
 volumes:
   mongodb_data:
+  qdrant_storage:
+  llm_models:
