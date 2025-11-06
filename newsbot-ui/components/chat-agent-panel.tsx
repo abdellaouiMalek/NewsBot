@@ -35,7 +35,7 @@ export function ChatAgentPanel({ onClose }: ChatAgentPanelProps) {
       id: "1",
       type: "agent",
       content:
-        "Hi! I'm your NewsBot AI assistant powered by RAG (Retrieval-Augmented Generation). Ask me questions about news articles, and I'll search our database and provide factual, context-aware answers with sources.",
+        "Hi! I'm your NewsBot AI assistant. Ask me questions about news articles, and I'll search our database and provide factual, context-aware answers with sources.",
       timestamp: new Date(),
     },
   ])
@@ -116,7 +116,7 @@ export function ChatAgentPanel({ onClose }: ChatAgentPanelProps) {
   }
 
   return (
-    <aside className="hidden md:flex w-80 border-l border-border bg-card p-6 flex-col overflow-hidden relative">
+    <aside className="hidden md:flex w-140 min-w-80 border-l border-border bg-card p-6 flex-col overflow-hidden relative">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold flex items-center gap-2 text-foreground">
@@ -136,7 +136,7 @@ export function ChatAgentPanel({ onClose }: ChatAgentPanelProps) {
           <div key={message.id} className={cn("flex", message.type === "user" ? "justify-end" : "justify-start")}>
             <div
               className={cn(
-                "max-w-xs px-4 py-3 rounded-lg text-sm leading-relaxed",
+                "max-w-xl w-[85%] px-4 py-3 rounded-lg text-sm leading-relaxed",
                 message.type === "user"
                   ? "bg-primary text-primary-foreground rounded-br-none"
                   : "bg-muted text-foreground rounded-bl-none border border-border",

@@ -18,7 +18,7 @@ class RAGPipeline:
 
     async def generate_answer(self, query: str, k: int = 5) -> dict:
         # Step 1: Retrieve relevant documents
-        docs = self.retriever.search(query=query, k=k)
+        docs = await self.retriever.search(query=query, k=k)
         serialized_docs = [d.metadata | {"snippet": d.page_content} for d in docs]
 
         # Step 2: Build context

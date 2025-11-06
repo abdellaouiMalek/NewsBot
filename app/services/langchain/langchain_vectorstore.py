@@ -8,6 +8,8 @@ from langchain_qdrant import Qdrant
 from qdrant_client import QdrantClient
 
 from app.core.config import settings
+from app.core.database import get_database
+from app.services.article.article_service import ArticleService
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +68,7 @@ class LangchainQdrantConnector:
             return None
         return {"must": [{"key": k, "match": {"value": v}} for k, v in filters.items()]}
 
-    def search(
+    async def search(
         self,
         query: Optional[str] = None,
         *,
@@ -108,22 +110,79 @@ class LangchainQdrantConnector:
             with_payload=True,
         )
 
-        # 3️⃣ Convert to LangChain Documents
-        documents = [
-            Document(
-                page_content=point.payload.get("content", ""),
-                metadata={
-                    "article_id": point.payload.get("article_id"),
-                    "category": point.payload.get("category"),
-                    "source_name": point.payload.get("source_name"),
-                    "published_at": point.payload.get("published_at"),
-                    "score": point.score,
-                },
-            )
+        # 3️⃣ Fetch full articles from MongoDB using article_ids
+        article_ids = [
+            point.payload.get("article_id")
             for point in results
+            if point.payload.get("article_id")
         ]
 
+        if article_ids:
+            database = get_database()
+            article_service = ArticleService(database)
+
+            # Fetch full articles using ArticleService
+            articles = []
+            for article_id in article_ids:
+                article = await article_service.get_article_by_article_id(article_id)
+                if article:
+                    articles.append(article)
+
+            # Create a lookup dict for quick access
+            articles_by_id = {article.article_id: article for article in articles}
+        else:
+            articles_by_id = {}
+
+        # 4️⃣ Convert to LangChain Documents with full content
+        documents = []
+        for point in results:
+            article_id = point.payload.get("article_id")
+            full_article = articles_by_id.get(article_id) if article_id else None
+
+            # Use embedding_primary_text as page_content if available, otherwise fallback to Qdrant payload
+            page_content = ""
+            if full_article and full_article.embedding_primary_text:
+                page_content = full_article.embedding_primary_text
+            else:
+                page_content = point.payload.get("content", "")
+
+            # Build comprehensive metadata
+            metadata = {
+                "article_id": article_id,
+                "score": point.score,
+            }
+
+            # Add metadata from Qdrant payload
+            for key in ["category", "source_name", "published_at"]:
+                value = point.payload.get(key)
+                if value is not None:
+                    metadata[key] = value
+
+            # Add additional metadata from full MongoDB article if available
+            if full_article:
+                for key in [
+                    "title",
+                    "summary",
+                    "author",
+                    "article_url",
+                    "language",
+                    "country",
+                    "tags",
+                    "sentiment",
+                    "entities",
+                ]:
+                    value = getattr(full_article, key, None)
+                    if value is not None:
+                        metadata[key] = value
+
+            documents.append(
+                Document(
+                    page_content=page_content,
+                    metadata=metadata,
+                )
+            )
+
         logger.info(
-            f"🔍 Found {len(documents)} similar documents for query '{query[:30]}...'"
+            f"🔍 Found {len(documents)} similar documents for query '{query[:30]}...' (with full content from MongoDB)"
         )
         return documents

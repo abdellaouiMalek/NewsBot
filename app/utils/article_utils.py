@@ -168,14 +168,6 @@ async def extract_embeddings_qdrant(articles: List[Article], db):
         # Compute vectors
         vectors = compute_article_embeddings(article_dict)
 
-        print("\n==============================")
-        for name, vector in vectors.items():
-            if vector is None:
-                print(f"{name}: None")
-            else:
-                print(f"{name}: length={len(vector)}, first 5 values={vector[:5]}")
-        print("================================\n")
-
         # Build Qdrant schema
         embedding = ArticleEmbeddingCreate(
             article_id=article.article_id,
