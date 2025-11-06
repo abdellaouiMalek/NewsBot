@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 from app.services.langchain.rag_pipeline import RAGPipeline
 
-router = APIRouter(prefix="/generate", tags=["Generate"])
+router = APIRouter(prefix="", tags=["Generate"])
 rag_pipeline = RAGPipeline()
 
 
@@ -12,7 +12,7 @@ class GenerateRequest(BaseModel):
     k: int = 5
 
 
-@router.post("/generate/")
+@router.post("/")
 async def generate_answer(request: GenerateRequest):
     """
     Generate an AI-augmented news answer for a given query.

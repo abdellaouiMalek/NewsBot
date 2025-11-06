@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any, List, Mapping, Optional
 
 import httpx
@@ -8,6 +9,8 @@ import requests
 from langchain.llms.base import LLM
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class OllamaLLM(LLM):
@@ -64,6 +67,7 @@ class OllamaLLM(LLM):
         """
         Synchronous call to Ollama REST API. Adjust endpoint/payload per your server version.
         """
+        logger.info(f"🤖 Calling Ollama LLM with model: {self.model_name}")
         payload = {
             "model": self.model_name,
             "prompt": prompt,
@@ -79,8 +83,12 @@ class OllamaLLM(LLM):
         # incremental 'response' fields. To handle both streaming and
         # non-streaming responses, request the endpoint with stream=True and
         # accumulate any returned chunks.
+        # Increased timeout to 300s (5min) to allow model loading on first request
+        logger.debug(
+            "⏳ Waiting for Ollama response (may take up to 5min on first load)..."
+        )
         chunks: List[str] = []
-        with requests.post(url, json=payload, timeout=60, stream=True) as resp:
+        with requests.post(url, json=payload, timeout=300, stream=True) as resp:
             resp.raise_for_status()
 
             # Iterate over streamed lines. For non-streaming responses this
@@ -127,9 +135,8 @@ class OllamaLLM(LLM):
         # last response body (requests will have consumed it above in
         # non-streaming cases, but keep this defensive path).
         try:
-            # Re-run a simple non-streaming request (short timeout) to get
-            # the final body in case the server didn't stream.
-            resp = requests.post(url, json=payload, timeout=20)
+            # Re-run a simple non-streaming request (longer timeout for model loading)
+            resp = requests.post(url, json=payload, timeout=120)
             resp.raise_for_status()
             data = resp.json()
         except Exception:
@@ -155,6 +162,7 @@ class OllamaLLM(LLM):
         return str(data)
 
     async def _acall(self, prompt: str, stop: Optional[List[str]] = None) -> str:
+        logger.info(f"🤖 Calling Ollama LLM (async) with model: {self.model_name}")
         payload = {
             "model": self.model_name,
             "prompt": prompt,
@@ -167,7 +175,11 @@ class OllamaLLM(LLM):
 
         url = f"{self.base_url.rstrip('/')}/api/generate"
         chunks: List[str] = []
-        async with httpx.AsyncClient(timeout=60) as client:
+        # Increased timeout to 300s (5min) to allow model loading on first request
+        logger.debug(
+            "⏳ Waiting for Ollama response (may take up to 5min on first load)..."
+        )
+        async with httpx.AsyncClient(timeout=300) as client:
             # Use streaming to consume incremental NDJSON events
             async with client.stream("POST", url, json=payload) as resp:
                 resp.raise_for_status()
@@ -208,7 +220,7 @@ class OllamaLLM(LLM):
 
         # Fallback: try a simple non-streaming request
         try:
-            async with httpx.AsyncClient(timeout=20) as client:
+            async with httpx.AsyncClient(timeout=120) as client:
                 resp = await client.post(url, json=payload)
                 resp.raise_for_status()
                 data = resp.json()
@@ -243,4 +255,5 @@ class LLMClient:
         return self.llm(prompt)
 
     async def generate_async(self, prompt: str) -> str:
-        return await self.llm.apredict(prompt)
+        # Use ainvoke instead of deprecated apredict
+        return await self.llm.ainvoke(prompt)

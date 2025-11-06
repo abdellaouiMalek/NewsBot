@@ -1,7 +1,7 @@
 import re
 from typing import Dict, List
 
-from app.core.models.embedding_model import EMBEDDING_MODEL
+from app.core.models.embedding_model import get_embedding_model
 from app.utils.nlp_utils import extract_key_phrases
 
 
@@ -103,8 +103,9 @@ def compute_embeddings(texts: List[str]) -> List[List[float]]:
     if not texts:
         return []
 
-    # Use the sentence-transformers model
-    return EMBEDDING_MODEL.encode(
+    # Use the sentence-transformers model (lazy-loaded)
+    model = get_embedding_model()
+    return model.encode(
         texts,
         batch_size=32,
         show_progress_bar=False,

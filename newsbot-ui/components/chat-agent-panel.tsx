@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Send, Sparkles, Filter, Clock, Tag, X } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Clock, Filter, Send, Sparkles, Tag, X } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
 
 interface Message {
   id: string
@@ -23,10 +23,10 @@ interface ChatAgentPanelProps {
 }
 
 const suggestedActions = [
-  { icon: Filter, label: "Filter by Tech", action: "Show me only tech news" },
-  { icon: Clock, label: "Last 24h", action: "Filter news from the last 24 hours" },
-  { icon: Tag, label: "Trending", action: "Show trending topics" },
-  { icon: Sparkles, label: "AI Summary", action: "Summarize today's top stories" },
+  { icon: Filter, label: "Tech News", action: "What are the latest developments in AI technology?" },
+  { icon: Clock, label: "Recent Events", action: "What happened in the news today?" },
+  { icon: Tag, label: "Trending", action: "What are the trending topics right now?" },
+  { icon: Sparkles, label: "Summary", action: "Summarize the top news stories" },
 ]
 
 export function ChatAgentPanel({ onClose }: ChatAgentPanelProps) {
@@ -35,7 +35,7 @@ export function ChatAgentPanel({ onClose }: ChatAgentPanelProps) {
       id: "1",
       type: "agent",
       content:
-        "Hi! I'm your NewsBot AI assistant. I can help you filter, search, and organize your news feed. What would you like to do?",
+        "Hi! I'm your NewsBot AI assistant powered by RAG (Retrieval-Augmented Generation). Ask me questions about news articles, and I'll search our database and provide factual, context-aware answers with sources.",
       timestamp: new Date(),
     },
   ])
@@ -65,49 +65,54 @@ export function ChatAgentPanel({ onClose }: ChatAgentPanelProps) {
     setInput("")
     setIsLoading(true)
 
-    setTimeout(() => {
-      let agentResponse = ""
-      let action: Message["action"] | undefined
+    try {
+      // Call the /generate API endpoint
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1"
+      const response = await fetch(`${apiUrl}/generate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query: text,
+          k: 5,
+        }),
+      })
 
-      const lowerText = text.toLowerCase()
-
-      if (lowerText.includes("tech") || lowerText.includes("technology")) {
-        agentResponse = "Filtering news to show only Technology articles. I found 24 relevant stories for you."
-        action = { type: "filter", value: "tech" }
-      } else if (lowerText.includes("last 24") || lowerText.includes("today")) {
-        agentResponse = "Showing news from the last 24 hours. Found 156 articles matching your criteria."
-        action = { type: "filter", value: "24h" }
-      } else if (lowerText.includes("trending") || lowerText.includes("popular")) {
-        agentResponse =
-          "Here are today's trending topics: #AI (12.5K posts), #Elections (15.3K posts), #Climate (8.2K posts)"
-        action = { type: "sort", value: "trending" }
-      } else if (lowerText.includes("summary") || lowerText.includes("summarize")) {
-        agentResponse =
-          "📰 Top Stories Summary:\n1. Major tech acquisition announced\n2. Markets respond to Fed decision\n3. International summit begins\n\nWould you like more details on any of these?"
-        action = { type: "sort", value: "summary" }
-      } else if (lowerText.includes("business") || lowerText.includes("finance")) {
-        agentResponse =
-          "Filtering to Business & Finance news. Found 42 articles. Top story: Markets respond to Federal Reserve decision."
-        action = { type: "filter", value: "business" }
-      } else if (lowerText.includes("search") || lowerText.includes("find")) {
-        agentResponse = "I can help you search! What topic or keyword would you like me to search for?"
-        action = { type: "search", value: text }
-      } else {
-        agentResponse =
-          "I can help you with that! Try asking me to filter by category (Tech, Business, Science), sort by trending, or summarize today's news."
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`)
       }
+
+      const data = await response.json()
+
+      // Extract the answer and sources from the RAG pipeline response
+      const agentResponse = data.answer || "I couldn't generate a response. Please try again."
+      const sources = data.sources || []
 
       const agentMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: "agent",
         content: agentResponse,
         timestamp: new Date(),
-        action,
+        action: sources.length > 0 ? { type: "search", value: `${sources.length} sources` } : undefined,
       }
 
       setMessages((prev) => [...prev, agentMessage])
+    } catch (error) {
+      console.error("Error calling /generate API:", error)
+      
+      // Show error message to user
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        type: "agent",
+        content: `Sorry, I encountered an error: ${error instanceof Error ? error.message : "Unknown error"}. Please make sure the API server is running.`,
+        timestamp: new Date(),
+      }
+
+      setMessages((prev) => [...prev, errorMessage])
+    } finally {
       setIsLoading(false)
-    }, 600)
+    }
   }
 
   return (
@@ -118,7 +123,7 @@ export function ChatAgentPanel({ onClose }: ChatAgentPanelProps) {
             <Sparkles className="h-5 w-5 text-primary" />
             NewsBot Assistant
           </h2>
-          <p className="text-xs text-muted-foreground mt-1">Ask me to filter, search, or organize your feed</p>
+          <p className="text-xs text-muted-foreground mt-1">Ask questions about news and get AI-powered answers</p>
         </div>
         <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 shrink-0" title="Close chat assistant">
           <X className="h-4 w-4" />

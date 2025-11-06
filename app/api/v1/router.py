@@ -18,4 +18,4 @@ router.include_router(scheduler_router, prefix="/scheduler", tags=["Scheduler"])
 router.include_router(
     semantic_search_router, prefix="/semantic_search", tags=["Semantic Search"]
 )
-router.include_router(generate_router, prefix="/generate", tags=["Gnerate"])
+router.include_router(generate_router, prefix="/generate", tags=["Generate"])

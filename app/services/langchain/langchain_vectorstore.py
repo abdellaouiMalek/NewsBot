@@ -1,7 +1,7 @@
 import logging
+import os
 from typing import Dict, List, Optional
 
-import torch
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_qdrant import Qdrant
@@ -9,11 +9,11 @@ from qdrant_client import QdrantClient
 
 from app.core.config import settings
 
-# from app.core.models.embedding_model import EMBEDDING_MODEL
-
 logger = logging.getLogger(__name__)
 
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+# Respect environment override for embedding device, default to CPU to avoid OOM
+# during import. For GPU usage, set EMBEDDING_DEVICE=cuda in your env.
+DEVICE = os.environ.get("EMBEDDING_DEVICE", "cpu")
 
 
 class LangchainQdrantConnector:
@@ -28,7 +28,11 @@ class LangchainQdrantConnector:
         embedding_model: Optional[str] = None,
     ):
         self.vector_name = vector_name
-        self.embedding_model_name = "sentence-transformers/all-mpnet-base-v2"
+        # Default to all-mpnet-base-v2 (768 dims) to match Qdrant collection
+        # Override via env var EMBEDDING_MODEL_NAME or parameter
+        self.embedding_model_name = embedding_model or os.environ.get(
+            "EMBEDDING_MODEL_NAME", "sentence-transformers/all-mpnet-base-v2"
+        )
 
         # Qdrant connection
         self.client = QdrantClient(
@@ -36,7 +40,9 @@ class LangchainQdrantConnector:
             api_key=getattr(settings, "QDRANT_API_KEY", None),
         )
 
-        # LangChain embeddings
+        # LangChain embeddings - use CPU by default to avoid OOM during import
+        # Set EMBEDDING_DEVICE=cuda in environment to use GPU
+        logger.info(f"🔧 Loading HuggingFace embeddings on device={DEVICE}")
         self.embedding_fn = HuggingFaceEmbeddings(
             model_name=self.embedding_model_name,
             model_kwargs={"device": DEVICE},
