@@ -124,3 +124,16 @@ class ArticleResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ArticleListResponse(BaseModel):
+    """Paginated list response for articles."""
+
+    articles: List[ArticleResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+    class Config:
+        from_attributes = True

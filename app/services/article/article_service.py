@@ -77,6 +77,29 @@ class ArticleService:
             articles.append(Article(**article_data))
         return articles
 
+    async def count_articles(
+        self,
+        category: Optional[str] = None,
+        source_name: Optional[str] = None,
+        fetch_method: Optional[str] = None,
+        language: Optional[str] = None,
+        country: Optional[str] = None,
+    ) -> int:
+        """Return the total number of articles matching optional filters."""
+        query = {}
+        if category:
+            query["category"] = category
+        if source_name:
+            query["source_name"] = source_name
+        if fetch_method:
+            query["fetch_method"] = fetch_method
+        if language:
+            query["language"] = language
+        if country:
+            query["country"] = country
+
+        return await self.collection.count_documents(query)
+
     async def update_article(
         self, article_id: str, article_update: ArticleUpdate
     ) -> Optional[Article]:
@@ -217,6 +240,36 @@ class ArticleService:
 
         result = await self.collection.bulk_write(operations, ordered=False)
         return result.modified_count
+
+    async def get_categories(self) -> List[str]:
+        """Return a sorted list of distinct non-null categories present in articles."""
+        try:
+            pipeline = [
+                {"$match": {"category": {"$ne": None}}},
+                {"$group": {"_id": "$category"}},
+                {"$sort": {"_id": 1}},
+            ]
+            cursor = self.collection.aggregate(pipeline)
+            docs = await cursor.to_list(length=None)
+            return [doc["_id"] for doc in docs if doc and "_id" in doc]
+        except Exception:
+            return []
+
+    async def get_articles_by_ids(self, article_ids: List[str]) -> List[Article]:
+        """
+        Get multiple articles by their article_id field.
+        Returns articles in the same order as the input IDs.
+        """
+        if not article_ids:
+            return []
+
+        cursor = self.collection.find({"article_id": {"$in": article_ids}})
+        articles_dict = {}
+        async for article_data in cursor:
+            articles_dict[article_data["article_id"]] = Article(**article_data)
+
+        # Return articles in the same order as article_ids
+        return [articles_dict[aid] for aid in article_ids if aid in articles_dict]
 
     async def update_embeddings_bulk(self, articles: list[dict]) -> int:
         """

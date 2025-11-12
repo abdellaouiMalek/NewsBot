@@ -3,6 +3,8 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useGenerateResponse } from "@/lib/api"
+import { Article } from "@/lib/api/schemas/article.schema"
 import { cn } from "@/lib/utils"
 import { Clock, Filter, Send, Sparkles, Tag, X } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
@@ -20,6 +22,7 @@ interface Message {
 
 interface ChatAgentPanelProps {
   onClose?: () => void
+  onArticlesUpdate?: (articles: Article[]) => void
 }
 
 const suggestedActions = [
@@ -29,7 +32,7 @@ const suggestedActions = [
   { icon: Sparkles, label: "Summary", action: "Summarize the top news stories" },
 ]
 
-export function ChatAgentPanel({ onClose }: ChatAgentPanelProps) {
+export function ChatAgentPanel({ onClose, onArticlesUpdate }: ChatAgentPanelProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -40,8 +43,10 @@ export function ChatAgentPanel({ onClose }: ChatAgentPanelProps) {
     },
   ])
   const [input, setInput] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Use the new API hook
+  const generateMutation = useGenerateResponse()
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -63,41 +68,36 @@ export function ChatAgentPanel({ onClose }: ChatAgentPanelProps) {
 
     setMessages((prev) => [...prev, userMessage])
     setInput("")
-    setIsLoading(true)
 
     try {
-      // Call the /generate API endpoint
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1"
-      const response = await fetch(`${apiUrl}/generate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          query: text,
-          k: 5,
-        }),
+      // Use the mutation to call the API
+      const response = await generateMutation.mutateAsync({
+        query: text,
+        k: 5,
       })
 
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status} ${response.statusText}`)
-      }
-
-      const data = await response.json()
-
-      // Extract the answer and sources from the RAG pipeline response
-      const agentResponse = data.answer || "I couldn't generate a response. Please try again."
-      const sources = data.sources || []
+      // Extract the answer, sources, and articles from the RAG pipeline response
+      const agentResponse = response.answer || "I couldn't generate a response. Please try again."
+      const sources = response.sources || []
+      const articles = response.articles || []
+      
+      // Count sources
+      const sourceCount = sources.length
 
       const agentMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: "agent",
         content: agentResponse,
         timestamp: new Date(),
-        action: sources.length > 0 ? { type: "search", value: `${sources.length} sources` } : undefined,
+        action: sourceCount > 0 ? { type: "search", value: `${sourceCount} sources` } : undefined,
       }
 
       setMessages((prev) => [...prev, agentMessage])
+
+      // Update parent component with the articles used in the response
+      if (onArticlesUpdate && articles.length > 0) {
+        onArticlesUpdate(articles)
+      }
     } catch (error) {
       console.error("Error calling /generate API:", error)
       
@@ -110,8 +110,6 @@ export function ChatAgentPanel({ onClose }: ChatAgentPanelProps) {
       }
 
       setMessages((prev) => [...prev, errorMessage])
-    } finally {
-      setIsLoading(false)
     }
   }
 
@@ -154,19 +152,24 @@ export function ChatAgentPanel({ onClose }: ChatAgentPanelProps) {
             </div>
           </div>
         ))}
-        {isLoading && (
+        {generateMutation.isPending && (
           <div className="flex justify-start">
             <div className="bg-muted text-foreground px-4 py-3 rounded-lg rounded-bl-none border border-border">
-              <div className="flex gap-2">
-                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" />
-                <div
-                  className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
-                  style={{ animationDelay: "0.2s" }}
-                />
-                <div
-                  className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
-                  style={{ animationDelay: "0.4s" }}
-                />
+              <div className="flex flex-col gap-2">
+                <div className="flex gap-2">
+                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" />
+                  <div
+                    className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
+                    style={{ animationDelay: "0.2s" }}
+                  />
+                  <div
+                    className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
+                    style={{ animationDelay: "0.4s" }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Searching articles and generating response...
+                </p>
               </div>
             </div>
           </div>
@@ -208,13 +211,13 @@ export function ChatAgentPanel({ onClose }: ChatAgentPanelProps) {
               handleSendMessage(input)
             }
           }}
-          disabled={isLoading}
+          disabled={generateMutation.isPending}
           className="text-sm"
         />
         <Button
           size="icon"
           onClick={() => handleSendMessage(input)}
-          disabled={isLoading || !input.trim()}
+          disabled={generateMutation.isPending || !input.trim()}
           className="shrink-0"
         >
           <Send className="h-4 w-4" />

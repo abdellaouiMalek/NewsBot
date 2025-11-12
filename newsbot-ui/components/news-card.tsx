@@ -1,15 +1,16 @@
 "use client"
 
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Clock, ExternalLink, Sparkles, ShieldCheck, ThumbsUp, ThumbsDown } from "lucide-react"
-import { useState } from "react"
 import { FactCheckingModal } from "@/components/fact-checking-modal"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { usePreferences } from "@/lib/preferences-hook"
+import { stripHtml } from "@/lib/utils"
+import { Clock, ExternalLink, ShieldCheck, ThumbsDown, ThumbsUp } from "lucide-react"
+import { useState } from "react"
 
 interface NewsCardProps {
   id?: number
+  articleId?: string
   headline: string
   summary: string
   source: string
@@ -17,13 +18,17 @@ interface NewsCardProps {
   category: string
 }
 
-export function NewsCard({ id = 1, headline, summary, source, time, category }: NewsCardProps) {
+export function NewsCard({ id = 1, articleId, headline, summary, source, time, category }: NewsCardProps) {
   const [isFactCheckOpen, setIsFactCheckOpen] = useState(false)
   const [feedbackGiven, setFeedbackGiven] = useState(false)
   const { addFeedback } = usePreferences()
 
+  // Strip any HTML that might come from the backend for safe display
+  const safeHeadline = stripHtml(headline);
+  const safeSummary = stripHtml(summary);
+
   const handleFeedback = (rating: "like" | "dislike", relevant: boolean) => {
-    addFeedback(id, headline, category, rating, relevant)
+    addFeedback(id, safeHeadline, category, rating, relevant)
     setFeedbackGiven(true)
     setTimeout(() => setFeedbackGiven(false), 2000)
   }
@@ -33,21 +38,23 @@ export function NewsCard({ id = 1, headline, summary, source, time, category }: 
       <Card className="group hover:shadow-lg transition-all duration-300 hover:border-primary/50 w-full">
         <CardHeader className="space-y-2 md:space-y-3 p-4 md:p-6">
           <div className="flex items-start justify-between gap-2 md:gap-4">
-            <h3 className="text-lg md:text-xl font-semibold leading-tight group-hover:text-primary transition-colors text-balance">
-              {headline}
+              <h3 className="text-lg md:text-xl font-semibold leading-tight group-hover:text-primary transition-colors text-balance">
+              {safeHeadline}
             </h3>
-            <Badge
+            {/* <Badge
               variant="secondary"
               className="shrink-0 bg-primary/10 text-primary border-primary/20 text-xs md:text-sm"
             >
               <Sparkles className="h-3 w-3 mr-1" />
               AI
-            </Badge>
+            </Badge> */}
           </div>
         </CardHeader>
 
         <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
-          <p className="text-sm md:text-base text-muted-foreground leading-relaxed text-pretty">{summary}</p>
+          <p className="text-sm md:text-base text-muted-foreground leading-relaxed text-pretty">
+            {stripHtml(summary)}
+          </p>
         </CardContent>
 
         <CardFooter className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-0 p-4 md:p-6 pt-0 md:pt-0">
@@ -107,8 +114,9 @@ export function NewsCard({ id = 1, headline, summary, source, time, category }: 
       <FactCheckingModal
         isOpen={isFactCheckOpen}
         onClose={() => setIsFactCheckOpen(false)}
-        headline={headline}
-        summary={summary}
+        articleId={articleId || ""}
+        headline={safeHeadline}
+        summary={safeSummary}
         originalSource={source}
       />
     </>

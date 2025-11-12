@@ -1,68 +1,77 @@
 "use client"
 
-import { useState } from "react"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
 import { NewsCard } from "@/components/news-card"
-import { Search } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
+import { Search, Sparkles, X } from "lucide-react"
+import { useEffect, useState } from "react"
 
-const categories = ["For You", "Breaking", "Politics", "Tech", "Business", "Science", "Sports", "Entertainment"]
-
-const newsItems = [
-  {
-    id: 1,
-    headline: "AI Breakthrough: New Model Achieves Human-Level Reasoning",
-    summary:
-      "Researchers announce a significant advancement in artificial intelligence, with a new model demonstrating unprecedented reasoning capabilities across multiple domains.",
-    source: "TechCrunch",
-    time: "2h ago",
-    category: "Tech",
-  },
-  {
-    id: 2,
-    headline: "Global Climate Summit Reaches Historic Agreement",
-    summary:
-      "World leaders commit to ambitious carbon reduction targets in landmark climate accord, marking a turning point in international environmental policy.",
-    source: "Reuters",
-    time: "4h ago",
-    category: "Politics",
-  },
-  {
-    id: 3,
-    headline: "Stock Markets Hit Record Highs Amid Economic Optimism",
-    summary:
-      "Major indices surge to all-time peaks as investors respond positively to strong earnings reports and favorable economic indicators.",
-    source: "Bloomberg",
-    time: "5h ago",
-    category: "Business",
-  },
-  {
-    id: 4,
-    headline: "Scientists Discover Potential Cure for Rare Disease",
-    summary:
-      "Medical researchers identify promising treatment pathway that could revolutionize care for patients with previously untreatable genetic condition.",
-    source: "Nature",
-    time: "7h ago",
-    category: "Science",
-  },
-  {
-    id: 5,
-    headline: "Championship Finals Draw Record Viewership Numbers",
-    summary:
-      "Historic sporting event captivates global audience, breaking previous records and highlighting the growing popularity of the sport worldwide.",
-    source: "ESPN",
-    time: "9h ago",
-    category: "Sports",
-  },
-]
+import { useDashboard } from "@/app/dashboard/layout"
+import { useCategories, useInfiniteArticles } from '@/lib/api'
 
 export function MainFeed() {
-  const [activeCategory, setActiveCategory] = useState("For You")
+  const [activeCategory, setActiveCategory] = useState('All')
+  const { data: categories, isLoading: isCategoriesLoading } = useCategories();
+  const { llmArticles, setLlmArticles } = useDashboard()
+
+  // When remote categories load, pick the first available if current active isn't present
+  useEffect(() => {
+    if (categories && categories.length) {
+      if (!categories.includes(activeCategory)) {
+        setActiveCategory(categories[0]);
+      }
+    }
+  }, [categories]);
+
+  // Articles - fetched via useInfiniteArticles
+  // If activeCategory is 'All' or falsy, fetch all articles (no category filter)
+  const articlesParams = !activeCategory || activeCategory === 'All'
+    ? { page_size: 10 }
+    : { page_size: 10, category: activeCategory };
+  const {
+    data: articlePages,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading: isArticlesLoading,
+    isError: isArticlesError,
+  } = useInfiniteArticles(articlesParams);
+
+  const regularArticles = articlePages?.pages.flatMap((p) => p.articles) ?? [];
+  
+  // Use LLM articles if available, otherwise use regular articles
+  const articles = llmArticles ?? regularArticles
+  const isLlmMode = llmArticles !== null
+
   const [searchQuery, setSearchQuery] = useState("")
 
   return (
     <div className="w-full space-y-4 md:space-y-6">
+      {/* LLM Mode Banner */}
+      {isLlmMode && (
+        <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            <div>
+              <p className="text-sm font-medium text-foreground">AI-Curated Results</p>
+              <p className="text-xs text-muted-foreground">
+                Showing {articles.length} article{articles.length !== 1 ? 's' : ''} selected by the AI assistant
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setLlmArticles(null)}
+            className="gap-2"
+          >
+            <X className="h-4 w-4" />
+            Clear
+          </Button>
+        </div>
+      )}
+
       {/* Search Bar */}
       <div className="relative">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -75,28 +84,55 @@ export function MainFeed() {
         />
       </div>
 
-      {/* Category Tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 md:mx-0 px-4 md:px-0">
-        {categories.map((category) => (
-          <Button
-            key={category}
-            variant={activeCategory === category ? "default" : "outline"}
-            className={cn(
-              "whitespace-nowrap text-sm md:text-base",
-              activeCategory === category && "bg-primary text-primary-foreground",
-            )}
-            onClick={() => setActiveCategory(category)}
-          >
-            {category}
-          </Button>
-        ))}
-      </div>
+      {/* Category Tabs - Hide in LLM mode */}
+      {!isLlmMode && (
+        <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 md:mx-0 px-4 md:px-0 flex-nowrap snap-x snap-mandatory">
+          {(categories ?? ['All']).map((category) => (
+            <Button
+              key={category}
+              variant={activeCategory === category ? "default" : "outline"}
+              className={cn(
+                "flex-none snap-start whitespace-nowrap text-sm md:text-base",
+                activeCategory === category && "bg-primary text-primary-foreground",
+              )}
+              onClick={() => setActiveCategory(category)}
+            >
+              {category}
+            </Button>
+          ))}
+        </div>
+      )}
 
       {/* News Feed */}
       <div className="space-y-3 md:space-y-4">
-        {newsItems.map((item) => (
-          <NewsCard key={item.id} id={item.id} {...item} />
-        ))}
+        {!isLlmMode && isArticlesLoading ? (
+          <div className="text-sm text-muted-foreground">Loading articles…</div>
+        ) : !isLlmMode && isArticlesError ? (
+          <div className="text-sm text-destructive">Failed to load articles.</div>
+        ) : articles.length === 0 ? (
+          <div className="text-sm text-muted-foreground">No articles yet.</div>
+        ) : (
+          articles.map((item, idx) => (
+            <NewsCard
+              key={item.id}
+              id={idx + 1}
+              articleId={item.article_id}
+              headline={item.title}
+              summary={item.summary ?? (item.content ? item.content.slice(0, 200) : '')}
+              source={item.source_name}
+              time={item.published_at ? new Date(String(item.published_at)).toLocaleString() : ''}
+              category={item.category ?? ''}
+            />
+          ))
+        )}
+
+        {!isLlmMode && hasNextPage && (
+          <div className="flex justify-center pt-4">
+            <Button onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+              {isFetchingNextPage ? 'Loading...' : 'Load more'}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   )

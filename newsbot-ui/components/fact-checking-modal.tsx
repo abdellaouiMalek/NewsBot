@@ -1,72 +1,66 @@
 "use client"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { TrustRatingIndicator } from "@/components/trust-rating-indicator"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { TrustRatingIndicator } from "@/components/trust-rating-indicator"
-import { AlertCircle, CheckCircle2, XCircle } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { SourceComparison, useFactCheck } from "@/lib/api"
+import { AlertCircle, CheckCircle2, Loader2, XCircle } from "lucide-react"
+import { useEffect, useState } from "react"
 
 interface FactCheckingModalProps {
   isOpen: boolean
   onClose: () => void
+  articleId: string
   headline: string
   summary: string
   originalSource: string
 }
 
-interface SourceComparison {
-  source: string
-  headline: string
-  summary: string
-  trustScore: number
-  credibility: "high" | "medium" | "low"
-  factAccuracy: number
-  biasLevel: "low" | "medium" | "high"
-  reasoning: string
-}
+export function FactCheckingModal({ isOpen, onClose, articleId, headline, summary, originalSource }: FactCheckingModalProps) {
+  const factCheckMutation = useFactCheck()
+  const [sourceComparisons, setSourceComparisons] = useState<SourceComparison[]>([])
+  const [overallAssessment, setOverallAssessment] = useState("")
+  const [recommendation, setRecommendation] = useState("")
+  const [totalSourcesFound, setTotalSourcesFound] = useState(0)
 
-export function FactCheckingModal({ isOpen, onClose, headline, summary, originalSource }: FactCheckingModalProps) {
-  // Mock data for fact-checking comparison
-  const sourceComparisons: SourceComparison[] = [
-    {
-      source: originalSource,
-      headline: headline,
-      summary: summary,
-      trustScore: 85,
-      credibility: "high",
-      factAccuracy: 88,
-      biasLevel: "low",
-      reasoning:
-        "Established news organization with strong editorial standards. Story aligns with verified facts and includes multiple sources.",
-    },
-    {
-      source: "Independent News Network",
-      headline: "Breaking: Major Development in " + headline.split(":")[0],
-      summary:
-        "Similar story with additional context from alternative sources. Provides balanced perspective on the topic with independent verification.",
-      trustScore: 72,
-      credibility: "medium",
-      factAccuracy: 75,
-      biasLevel: "medium",
-      reasoning:
-        "Credible independent outlet with good track record. Story contains accurate information but includes some editorial interpretation.",
-    },
-    {
-      source: "Global Wire Service",
-      headline: headline.split(":")[0] + ": Full Analysis",
-      summary:
-        "Comprehensive coverage with international perspective. Includes expert commentary and historical context for better understanding.",
-      trustScore: 78,
-      credibility: "high",
-      factAccuracy: 82,
-      biasLevel: "low",
-      reasoning:
-        "International news agency with rigorous fact-checking process. Story is well-sourced and maintains journalistic integrity.",
-    },
-  ]
+  // Trigger fact-check when modal opens
+  useEffect(() => {
+    if (isOpen && articleId) {
+      // Reset state
+      setSourceComparisons([])
+      setOverallAssessment("")
+      setRecommendation("")
+      setTotalSourcesFound(0)
+
+      // Call fact-check API
+      factCheckMutation.mutate(
+        {
+          article_id: articleId,
+          headline,
+          summary,
+          source: originalSource,
+        },
+        {
+          onSuccess: (data) => {
+            setSourceComparisons(data.comparisons)
+            setOverallAssessment(data.overall_assessment)
+            setRecommendation(data.recommendation)
+            setTotalSourcesFound(data.total_sources_found)
+          },
+          onError: (error) => {
+            console.error("Fact-check error:", error)
+          },
+        }
+      )
+    }
+  }, [isOpen, articleId])
+
+  const isLoading = factCheckMutation.isPending
+  const isError = factCheckMutation.isError
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[90hw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl">Fact Check Analysis</DialogTitle>
           <DialogDescription>
@@ -75,115 +69,176 @@ export function FactCheckingModal({ isOpen, onClose, headline, summary, original
         </DialogHeader>
 
         <div className="space-y-6 mt-6">
-          {/* Original Article Summary */}
-          <Card className="bg-card/50 border-primary/20">
-            <CardHeader>
-              <CardTitle className="text-lg">Original Article</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <h3 className="font-semibold text-base">{headline}</h3>
-              <p className="text-sm text-muted-foreground">{summary}</p>
-              <Badge variant="outline">{originalSource}</Badge>
-            </CardContent>
-          </Card>
+          {/* Loading State */}
+          {isLoading && (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <div className="text-center space-y-2">
+                <p className="text-sm font-medium text-foreground">
+                  Performing AI-powered fact-check...
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  This may take 3-5 minutes. We're:
+                </p>
+                <ul className="text-xs text-muted-foreground space-y-1 text-left max-w-md mx-auto">
+                  <li>• Searching 15 similar articles using AI embeddings</li>
+                  <li>• Asking AI to identify articles about the same story</li>
+                  <li>• Analyzing each source for credibility and bias</li>
+                  <li>• Generating comprehensive assessment</li>
+                </ul>
+              </div>
+            </div>
+          )}
 
-          {/* Source Comparisons */}
-          <div className="space-y-4">
-            <h3 className="font-semibold text-lg">Source Comparison</h3>
+          {/* Error State */}
+          {isError && (
+            <Card className="bg-destructive/10 border-destructive/20">
+              <CardContent className="pt-6 space-y-2">
+                <p className="text-sm text-destructive font-medium">
+                  Failed to perform fact-check
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {factCheckMutation.error instanceof Error && 
+                   factCheckMutation.error.message.includes('timeout')
+                    ? 'The analysis took longer than expected. This can happen with complex articles or when the AI is busy. Please try again.'
+                    : 'An error occurred while analyzing the article. Please try again later.'}
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
-            {sourceComparisons.map((comparison, index) => (
-              <Card key={index} className="overflow-hidden">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <CardTitle className="text-base mb-2">{comparison.source}</CardTitle>
-                      <h4 className="font-medium text-sm mb-2">{comparison.headline}</h4>
-                      <p className="text-sm text-muted-foreground">{comparison.summary}</p>
-                    </div>
-                    <TrustRatingIndicator score={comparison.trustScore} />
-                  </div>
+          {/* Results */}
+          {!isLoading && !isError && (
+            <>
+              {/* Original Article Summary */}
+              <Card className="bg-card/50 border-primary/20">
+                <CardHeader>
+                  <CardTitle className="text-lg">Original Article</CardTitle>
                 </CardHeader>
-
-                <CardContent className="space-y-4">
-                  {/* Metrics */}
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground font-medium">Fact Accuracy</p>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-primary transition-all"
-                            style={{ width: `${comparison.factAccuracy}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-semibold">{comparison.factAccuracy}%</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground font-medium">Credibility</p>
-                      <div className="flex items-center gap-2">
-                        {comparison.credibility === "high" && <CheckCircle2 className="h-4 w-4 text-green-500" />}
-                        {comparison.credibility === "medium" && <AlertCircle className="h-4 w-4 text-yellow-500" />}
-                        {comparison.credibility === "low" && <XCircle className="h-4 w-4 text-red-500" />}
-                        <Badge
-                          variant="outline"
-                          className={
-                            comparison.credibility === "high"
-                              ? "bg-green-500/10 text-green-700 border-green-200"
-                              : comparison.credibility === "medium"
-                                ? "bg-yellow-500/10 text-yellow-700 border-yellow-200"
-                                : "bg-red-500/10 text-red-700 border-red-200"
-                          }
-                        >
-                          {comparison.credibility.charAt(0).toUpperCase() + comparison.credibility.slice(1)}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground font-medium">Bias Level</p>
-                      <Badge
-                        variant="outline"
-                        className={
-                          comparison.biasLevel === "low"
-                            ? "bg-green-500/10 text-green-700 border-green-200"
-                            : comparison.biasLevel === "medium"
-                              ? "bg-yellow-500/10 text-yellow-700 border-yellow-200"
-                              : "bg-red-500/10 text-red-700 border-red-200"
-                        }
-                      >
-                        {comparison.biasLevel.charAt(0).toUpperCase() + comparison.biasLevel.slice(1)}
-                      </Badge>
-                    </div>
-                  </div>
-
-                  {/* AI Reasoning */}
-                  <div className="bg-secondary/30 rounded-lg p-3 border border-secondary">
-                    <p className="text-xs font-semibold text-muted-foreground mb-1">AI Analysis</p>
-                    <p className="text-sm text-foreground">{comparison.reasoning}</p>
-                  </div>
+                <CardContent className="space-y-3">
+                  <h3 className="font-semibold text-base">{headline}</h3>
+                  <p className="text-sm text-muted-foreground">{summary}</p>
+                  <Badge variant="outline">{originalSource}</Badge>
                 </CardContent>
               </Card>
-            ))}
-          </div>
 
-          {/* Summary */}
-          <Card className="bg-primary/5 border-primary/20">
-            <CardHeader>
-              <CardTitle className="text-base">Overall Assessment</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <p>
-                This story is covered consistently across multiple reputable sources with high fact accuracy. The core
-                claims are well-supported by evidence and expert commentary.
-              </p>
-              <p className="text-muted-foreground">
-                <strong>Recommendation:</strong> This article is reliable for understanding the topic. All sources
-                maintain journalistic integrity with minimal bias.
-              </p>
-            </CardContent>
-          </Card>
+              {/* No sources found message */}
+              {totalSourcesFound === 0 && (
+                <Card className="bg-secondary/20 border-secondary">
+                  <CardContent className="pt-6">
+                    <p className="text-sm text-muted-foreground">
+                      No similar articles from other sources were found in the database.
+                      Unable to perform comparative fact-checking at this time.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Source Comparisons */}
+              {sourceComparisons.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">
+                    Source Comparison ({totalSourcesFound} {totalSourcesFound === 1 ? 'source' : 'sources'} found)
+                  </h3>
+
+                  <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory">
+                    {sourceComparisons.map((comparison, index) => (
+                      <Card key={index} className="overflow-hidden flex-none w-[400px] snap-start">
+                        <CardHeader className="pb-3">
+                          <div className="flex flex-col gap-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <CardTitle className="text-base flex-1">{comparison.source}</CardTitle>
+                              <TrustRatingIndicator score={comparison.trust_score} />
+                            </div>
+                            <h4 className="font-medium text-sm">{comparison.headline}</h4>
+                            <p className="text-sm text-muted-foreground line-clamp-3">{comparison.summary}</p>
+                          </div>
+                        </CardHeader>
+
+                        <CardContent className="space-y-4">
+                          {/* Metrics */}
+                          <div className="space-y-3">
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground font-medium">Fact Accuracy</p>
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-primary transition-all"
+                                    style={{ width: `${comparison.fact_accuracy}%` }}
+                                  />
+                                </div>
+                                <span className="text-sm font-semibold">{comparison.fact_accuracy}%</span>
+                              </div>
+                            </div>
+
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground font-medium">Credibility</p>
+                              <div className="flex items-center gap-2">
+                                {comparison.credibility === "high" && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+                                {comparison.credibility === "medium" && <AlertCircle className="h-4 w-4 text-yellow-500" />}
+                                {comparison.credibility === "low" && <XCircle className="h-4 w-4 text-red-500" />}
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    comparison.credibility === "high"
+                                      ? "bg-green-500/10 text-green-700 border-green-200"
+                                      : comparison.credibility === "medium"
+                                        ? "bg-yellow-500/10 text-yellow-700 border-yellow-200"
+                                        : "bg-red-500/10 text-red-700 border-red-200"
+                                  }
+                                >
+                                  {comparison.credibility.charAt(0).toUpperCase() + comparison.credibility.slice(1)}
+                                </Badge>
+                              </div>
+                            </div>
+
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground font-medium">Bias Level</p>
+                              <Badge
+                                variant="outline"
+                                className={
+                                  comparison.bias_level === "low"
+                                    ? "bg-green-500/10 text-green-700 border-green-200"
+                                    : comparison.bias_level === "medium"
+                                      ? "bg-yellow-500/10 text-yellow-700 border-yellow-200"
+                                      : "bg-red-500/10 text-red-700 border-red-200"
+                                }
+                              >
+                                {comparison.bias_level.charAt(0).toUpperCase() + comparison.bias_level.slice(1)}
+                              </Badge>
+                            </div>
+                          </div>
+
+                          {/* AI Reasoning */}
+                          <div className="bg-secondary/30 rounded-lg p-3 border border-secondary">
+                            <p className="text-xs font-semibold text-muted-foreground mb-1">AI Analysis</p>
+                            <p className="text-sm text-foreground">{comparison.reasoning}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Summary */}
+              {overallAssessment && (
+                <Card className="bg-primary/5 border-primary/20">
+                  <CardHeader>
+                    <CardTitle className="text-base">Overall Assessment</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <p>{overallAssessment}</p>
+                    {recommendation && (
+                      <p className="text-muted-foreground">
+                        <strong>Recommendation:</strong> {recommendation}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
         </div>
       </DialogContent>
     </Dialog>
